@@ -21,6 +21,7 @@ Autoscale = $Autoscale
         slurm.version = $configuration_slurm_version
 
         [[[cluster-init cyclecloud/slurm:default:1.0.2]]]
+	[[[cluster-init beegfs:default:1.0.1]]]
         Optional = true
 
     [[node master]]
@@ -31,6 +32,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
 
         [[[cluster-init cyclecloud/slurm:master:1.0.2]]]
+	[[[cluster-init beegfs:manager:1.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -51,10 +53,45 @@ Autoscale = $Autoscale
         [[[configuration]]]
 
         [[[cluster-init cyclecloud/slurm:execute:1.0.2]]]
+	[[[cluster-init beegfs:client:1.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
+    [[nodearray storage]]
+    MachineType = $StorageVMType
+    
+    # The initial number of cores of this type to start when the cluster starts
+    InitialCount= $InitialStorageCount
 
+    Azure.AllocationMethod = Standalone
+
+        [[[volume disk1]]]
+        Size = $StorageDiskSize
+        SSD = true
+        Mount = beegfs
+        Persistent = true
+
+        [[[volume disk2]]]
+        Size = $StorageDiskSize
+        SSD = true
+        Mount = beegfs
+        Persistent = true
+
+        [[[configuration cyclecloud.mounts.beegfs]]]
+        mountpoint = $BeeGFSRoot
+        fs_type = ext4
+        raid_level = 0
+
+        [[[cluster-init beegfs:storage:1.0.1]]]	
+
+    [[nodearray metadata]]
+    MachineType = $MetadataVMType
+
+    # The initial number of cores of this type to start when the cluster starts
+    InitialCount= $InitialMetadataCount
+    Azure.AllocationMethod = Standalone
+
+        [[[cluster-init beegfs:metadata:1.0.1]]]
 
 [parameters About]
 Order = 1
@@ -65,6 +102,13 @@ Order = 1
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
         Config.Template := "<table><tr><td><img src='static/cloud/cluster/ui/ClusterIcon/slurm.png' width='192' height='192'></td></tr><tr><td><p>Slurm is a highly configurable open source workload manager. See the <a href=\"https://www.schedmd.com/\" target=\"_blank\">Slurm project site</a> for an overview.</p><p>Follow the instructions in the <a href=\"https://github.com/azure/cyclecloud-slurm/\" target=\"_blank\">README</a> for details on instructions on extending and configuring the Project for your environment.</p></td></tr></table>"
+    [[parameters About beegfs]]
+
+        [[[parameter beegfs]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<table><tr><td><img src='https://www.beegfs.io/content/wp-content/uploads/pics/beegfs-logo/BeeGFS_Logo_137x87.png' width='137' height='87'></td></tr><tr><td><p>BeeGFS is a parallel cluster file system. See the <a href=\"http://www.beegfs.io/content/\" target=\"_blank\">BeeGFS project site</a> for an overview.</p></td></tr></table>"
+	
 
 [parameters Required Settings]
 Order = 10
@@ -91,6 +135,20 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
         Config.Multiselect = true
+	
+	 [[[parameter MetadataVMType]]]
+        Label = Metadata VM
+        Description = The VMType type for metadata nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_D2_v3
+
+        [[[parameter StorageVMType]]]
+        Label = Storage VM
+        Description = The VMType type for storage nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_DS3_v2
+
+       
 
 
     [[parameters Auto-Scaling]]
@@ -116,6 +174,7 @@ Order = 10
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Use low priority instances for execute hosts
+	
 
     [[parameters Networking]]
     Order = 40
@@ -131,7 +190,7 @@ Order = 10
 Order = 20
 
     [[parameters Azure Settings]]
-    Order = 10 
+    Order = 15
 
         [[[parameter Credentials]]]
         Description = The credentials for the cloud provider
@@ -139,15 +198,47 @@ Order = 20
 
     [[parameters Slurm Settings ]]
     Description = "Section for configuring Slurm"
-    Order = 5
+    Order = 10
 
         [[[parameter configuration_slurm_version]]]
 required = True
 label = Slurm Version
 description = Version of Slurm to install on the cluster
 defaultvalue = 17.11.12-1
+    [[parameters BeeGFS Settings]]
+    Description = "Section for configuring BeeGFS"
+    Order = 5
 
+        [[[parameter StorageDiskSize]]]
+        Label = OSS Disk Size (GB)
+        Description = Size (GB) of each 2 premium disk attached to each OSS. Disks are raided in RAID0 configuration.
+        DefaultValue = 1024
+  
+        [[[parameter BeeGFSRoot ]]]
+        Label = BeeGFS Dir 
+        Description = The root directory for BeeGFS data on the MDT, MGS and OSS servers
+        DefaultValue = /data/beegfs    
 
+        [[[parameter InitialStorageCount]]]
+        Label = Storage VM Count
+        Description = The total number of storage VMs to start
+        DefaultValue = 2
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 0
+        Config.MaxValue = 10
+        Config.IntegerOnly = true
+
+        [[[parameter InitialMetadataCount]]]
+        Label = MDS VM Count
+        Description = The number of metadata servers to launch at startup
+        DefaultValue = 1
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 0
+        Config.MaxValue = 8
+        Config.IntegerOnly = true
+
+      
+  
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
     Order = 10
